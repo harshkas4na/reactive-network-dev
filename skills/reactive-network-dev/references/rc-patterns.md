@@ -293,6 +293,29 @@ function persistItemCreated(address, uint256 itemId, uint256 txHash) external ca
 
 ---
 
+## Admin / Owner Functions
+
+All owner-callable functions on the RC **must** use `rnOnly onlyOwner`, not just `onlyOwner`. The `rnOnly` modifier ensures the function can only execute as a real EVM transaction on the Reactive Network — never inside the ReactVM. This applies to **all** admin functions including ETH/token withdrawals, config changes, and rescue functions.
+
+```solidity
+function withdrawETH(uint256 amount) external rnOnly onlyOwner {
+    require(amount <= address(this).balance, "Insufficient balance");
+    (bool ok, ) = payable(msg.sender).call{value: amount}("");
+    require(ok, "Transfer failed");
+}
+
+function withdrawAllETH() external rnOnly onlyOwner {
+    uint256 bal = address(this).balance;
+    require(bal > 0, "No ETH");
+    (bool ok, ) = payable(msg.sender).call{value: bal}("");
+    require(ok, "Transfer failed");
+}
+```
+
+**Why both modifiers?** `rnOnly` prevents ReactVM execution; `onlyOwner` restricts to the deployer. Without `rnOnly`, a malicious event could theoretically cause `react()` to emit a callback that invokes an admin function.
+
+---
+
 ## Extracting Data from LogRecord
 
 ```solidity

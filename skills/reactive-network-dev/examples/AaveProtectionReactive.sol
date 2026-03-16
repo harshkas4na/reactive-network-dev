@@ -530,12 +530,12 @@ contract AaveProtectionReactive is IReactive, AbstractPausableReactive {
         address token,
         address to,
         uint256 amount
-    ) external onlyOwner {
+    ) external rnOnly onlyOwner {
         require(to != address(0), "Invalid recipient address");
         SafeERC20.safeTransfer(IERC20(token), to, amount);
     }
 
-    function rescueAllERC20(address token, address to) external onlyOwner {
+    function rescueAllERC20(address token, address to) external rnOnly onlyOwner {
         require(to != address(0), "Invalid recipient address");
         uint256 balance = IERC20(token).balanceOf(address(this));
         require(balance > 0, "No tokens to rescue");
@@ -543,14 +543,14 @@ contract AaveProtectionReactive is IReactive, AbstractPausableReactive {
     }
 
     // Emergency withdrawal functions - only deployer can call
-    function withdrawETH(uint256 amount) external onlyOwner {
+    function withdrawETH(uint256 amount) external rnOnly onlyOwner {
         require(amount <= address(this).balance, "Insufficient ETH balance");
 
         (bool success, ) = payable(msg.sender).call{value: amount}("");
         require(success, "ETH transfer failed");
     }
 
-    function withdrawAllETH() external onlyOwner {
+    function withdrawAllETH() external rnOnly onlyOwner {
         uint256 balance = address(this).balance;
         require(balance > 0, "No ETH to withdraw");
 
