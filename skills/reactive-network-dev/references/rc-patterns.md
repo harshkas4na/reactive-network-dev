@@ -105,7 +105,9 @@ function react(LogRecord calldata log) external vmOnly {
 
 ## Self-Callback for State Persistence
 
-Since `react()` cannot write state, emit a `Callback` back to `address(this)` to invoke a `callbackOnly` function:
+Since `react()` cannot write state, emit a `Callback` back to `address(this)` to invoke a `callbackOnly` function.
+
+**Critical:** The target `callbackOnly` function MUST have `address` as its first parameter (the sender/RVM ID slot). This is an extra param prepended to your business params. Pass `address(0)` for this slot in the payload — the RN replaces it with the RVM ID.
 
 ```solidity
 function _processItemConfigured(LogRecord calldata log) internal {

@@ -111,7 +111,8 @@ event Callback(
 
 - Emitting this from `react()` causes the RN to dispatch a call to `_contract` on `chain_id`
 - For **self-callbacks** (RC calling itself): `chain_id = block.chainid`, `_contract = address(this)`
-- The first parameter in `payload` must be `address(0)` — RN replaces it with the RVM ID at execution time
+- **The target function MUST have `address` as its first parameter** (the sender/RVM ID slot). This is an extra parameter prepended to your business params. In the `payload`, always pass `address(0)` for this slot — the RN replaces it with the RVM ID at execution time.
+  - If business logic needs `(uint256 id, string msg)`, the function is `fn(address sender, uint256 id, string msg)` and the payload is `abi.encodeWithSignature("fn(address,uint256,string)", address(0), id, msg)`
 - Only `Callback` events emitted from `react()` (vmOnly context) are dispatched. Callbacks emitted from `callbackOnly` are **silently ignored**.
 
 ---

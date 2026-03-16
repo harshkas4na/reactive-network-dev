@@ -301,6 +301,7 @@ contract MyCallback is AbstractCallback {
 ```
 
 **CC rules:**
+- **Every CC function called by the RC must have `address` as its first parameter** — this is the RVM ID sender slot, not a business parameter. Add it even if your function doesn't need it: `function doWork(address /* sender */, uint256 myParam) external authorizedSenderOnly`. The RC's payload must pass `address(0)` for this slot: `abi.encodeWithSignature("doWork(address,uint256)", address(0), myParam)`.
 - Always emit `CycleCompleted` (or equivalent) even when nothing executed — RC uses it to reset state
 - Use `try this._externalFn(...)` pattern for per-item isolation
 - Guard `_externalFn` with `require(msg.sender == address(this))`
@@ -315,7 +316,7 @@ contract MyCallback is AbstractCallback {
 3. **`callbackOnly` CAN call `service.subscribe`** — counter-intuitive but confirmed. Use this for all subscription management.
 4. **`cronTopic` is permanent** — `react()` always reads the constructor value. Exposing `setCronTopic` that writes to storage is misleading; it won't affect `react()`.
 5. **Subscription presence = active guard** — instead of checking `activeCount > 0` in `react()` (broken), unsubscribe from cron when the last item is cancelled. No subscription = no cron calls.
-6. **`address(0)` in self-callbacks** — always use `address(0)` as the first parameter in `abi.encodeWithSignature(...)` for self-callbacks. RN replaces it with the actual RVM ID.
+6. **Mandatory `address` sender as first parameter in ALL callback targets** — every function called via `emit Callback(...)` — whether on the CC or as a self-callback — MUST have `address` as its **first parameter** (the RVM ID slot). This is NOT a business parameter — it is an extra parameter prepended to your actual args. In the RC payload, always pass `address(0)` for this slot (RN replaces it with the RVM ID). Example: if your business logic needs `(address greeter, string message)`, the CC function signature must be `acknowledge(address sender, address greeter, string message)` and the RC payload must be `abi.encodeWithSignature("acknowledge(address,address,string)", address(0), greeter, message)`.
 7. **`if (!vm)` in constructor** — always wrap `service.subscribe()` calls with this guard.
 8. **Constructor must be `payable`** — RC needs ETH for callback delivery costs.
 9. **Minimum callback gas is 100,000** — always set `CALLBACK_GAS_LIMIT` to at least 100,000. Use 1,000,000–2,000,000 for complex CC logic.

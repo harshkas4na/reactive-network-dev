@@ -135,43 +135,74 @@ This pattern keeps `react()` simple and correct.
 
 ---
 
-## Gotcha 6: address(0) in Callback Payloads
+## Gotcha 6: Every Callback Target Must Have `address` as First Parameter (Sender Slot)
 
-**The rule:** Always use `address(0)` as the **first parameter** in `abi.encodeWithSignature(...)` calls within `emit Callback(...)`. The Reactive Network replaces this at execution time with the actual RVM ID (for self-callbacks) or the authorized sender (for CC callbacks).
+**The rule:** Every function called via `emit Callback(...)` — whether on the CC or as a self-callback on the RC — **MUST have `address` as its first parameter**. This is the sender/RVM ID slot. The Reactive Network injects the RVM ID into this slot at execution time. In the RC's payload, always pass `address(0)` for this slot.
 
-**Pattern:**
+**This is an EXTRA parameter.** If your business logic needs `(address greeter, string message)`, the target function signature must be `fn(address sender, address greeter, string message)` — three params, not two. The `address sender` is prepended.
+
+**What breaks:**
 ```solidity
-// Self-callback
-emit Callback(
-    block.chainid,
-    address(this),
-    GAS_LIMIT,
-    abi.encodeWithSignature(
-        "persistConfigCreated(address,uint256,uint256)",
-        address(0),  // ← MUST be address(0); RN injects RVM ID here
-        configId,
-        threshold
-    )
-);
+// BAD — CC function missing the sender slot
+// CC side:
+function acknowledge(address greeter, string calldata message) external authorizedSenderOnly { ... }
+// RC side:
+abi.encodeWithSignature("acknowledge(address,string)", greeter, message)
+// ↑ greeter gets replaced with RVM ID! Your actual greeter value is lost.
+// authorizedSenderOnly may also fail because the injected sender doesn't match expectations.
+```
 
-// Outbound callback to CC
+**Correct pattern:**
+```solidity
+// GOOD — sender slot is explicit and separate from business params
+
+// CC side — address as first param, then business params:
+function acknowledge(address /* sender */, address greeter, string calldata message) external authorizedSenderOnly {
+    // sender is RVM ID (validated by authorizedSenderOnly)
+    // greeter and message are your actual business data
+    emit Acknowledged(greeter, message);
+}
+
+// RC side — address(0) first, then business args:
 emit Callback(
     DEST_CHAIN_ID,
     callbackContract,
     GAS_LIMIT,
     abi.encodeWithSignature(
-        "checkAndProtect(address)",
-        address(0)  // ← MUST be address(0); RN injects RVM ID here
+        "acknowledge(address,address,string)",  // ← note: address appears TWICE
+        address(0),  // ← sender slot; RN replaces with RVM ID
+        greeter,     // ← actual business param
+        message      // ← actual business param
     )
 );
 ```
 
-On the CC side, the function receives the actual RVM ID as the first argument:
+**Same rule for self-callbacks on the RC:**
 ```solidity
-function checkAndProtect(address /* sender */) external authorizedSenderOnly {
-    // sender is the RVM ID, which AbstractCallback validates
-}
+// RC self-callback target:
+function persistItem(address /* sender */, uint256 itemId, uint256 threshold) external callbackOnly { ... }
+
+// RC payload in react():
+emit Callback(
+    block.chainid,
+    address(this),
+    GAS_LIMIT,
+    abi.encodeWithSignature(
+        "persistItem(address,uint256,uint256)",
+        address(0),  // ← sender slot
+        itemId,
+        threshold
+    )
+);
 ```
+
+**How we discovered this:** Generated a CC with `acknowledge(address greeter, string message)` where `greeter` was a business param. The RN overwrote `greeter` with the RVM ID, so the CC received the wrong address. The function signature in `encodeWithSignature` also didn't match because it had `(address,string)` instead of `(address,address,string)`.
+
+**Checklist:** For every `emit Callback(...)` in the RC, count the params:
+1. The function signature in `encodeWithSignature` must start with `address,`
+2. The first value arg after the signature string must be `address(0)`
+3. The target function must have `address` (or `address /* sender */`) as its first parameter
+4. Business params come after the sender slot in both the signature and the function
 
 ---
 

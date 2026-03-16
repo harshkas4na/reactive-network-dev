@@ -32,8 +32,11 @@ modifier authorizedSenderOnly() {
 
 The main function called by the RC via a `Callback` event. Always mark with `authorizedSenderOnly`.
 
+**Critical:** The first parameter MUST always be `address` — the RVM ID sender slot. This is an extra parameter prepended to any business params. If your function needs `(uint256 id, string msg)`, the signature is `fn(address sender, uint256 id, string msg)`. The RC passes `address(0)` for this slot and the RN replaces it with the actual RVM ID.
+
 ```solidity
 // The first parameter is always `address sender` — it receives the RVM ID injected by RN.
+// This is NOT a business parameter. It is always present, even if unused.
 // Mark it with /* */ to suppress "unused parameter" warnings.
 function doWork(address /* sender */) external authorizedSenderOnly {
     uint256 executed = 0;
