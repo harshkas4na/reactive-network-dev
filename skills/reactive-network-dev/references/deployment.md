@@ -195,13 +195,13 @@ echo "https://lasna.reactscan.net/address/$RC_ADDRESS"
 
 ## Quick Reference
 
-**Cron topic hashes** — see `references/architecture.md` for the full table. Common ones:
+**Cron topic hashes** — block-interval based, see `references/architecture.md` for full table:
 
-| Interval  | Topic Hash                                                             |
-|-----------|------------------------------------------------------------------------|
-| 1 minute  | `0x10f4e58e062105477d72f60b69049586448b6c43bf40e7c334b1093b0e965d57`  |
-| 5 minutes | `0x397d353798eb2ffcee4f62aad18906fd441cb6813b7d145398d4f170b6b976c2`  |
-| 1 hour    | `0x1c0a1b9e81bd760da4242b10e7a82d11ddfba3691c444fb8c451375f6642c1bd`  |
+| Event    | Interval (~time)      | Topic 0                                                              |
+|----------|-----------------------|----------------------------------------------------------------------|
+| Cron10   | 10 blocks (~1 min)    | `0x04463f7c1651e6b9774d7f85c85bb94654e3c46ca79b0c16fb16d4183307b687` |
+| Cron100  | 100 blocks (~12 min)  | `0xb49937fb8970e19fd46d48f7e3fb00d659deac0347f79cd7cb542f0fc1503c70` |
+| Cron1000 | 1000 blocks (~2 hr)   | `0xe20b31294d84c3661ddc8f423abb9c70310d0cf172aa2714ead78029b325e3f4` |
 
 **Chain IDs** — see `references/architecture.md` for the full table.
 

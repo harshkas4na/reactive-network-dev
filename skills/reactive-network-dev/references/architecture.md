@@ -256,21 +256,20 @@ Each destination chain has a **Callback Proxy** address — this is the address 
 
 ## Cron Topics
 
-Cron topics are keccak256 hashes of fixed cron schedule strings:
+Cron events fire based on **block intervals** on the Reactive Network (~7 second block time). There are exactly 5 cron events available — these are protocol-defined topic hashes, not user-computable:
 
-| Interval   | String                          | Topic Hash                                                           |
-|------------|---------------------------------|----------------------------------------------------------------------|
-| 1 minute   | `reactive-network-cron-1min`    | `0x10f4e58e062105477d72f60b69049586448b6c43bf40e7c334b1093b0e965d57` |
-| 5 minutes  | `reactive-network-cron-5min`    | `0x397d353798eb2ffcee4f62aad18906fd441cb6813b7d145398d4f170b6b976c2` |
-| 10 minutes | `reactive-network-cron-10min`   | `0x920d4adf25816805d3fbf353ccffae0c45c9e96e0f300652fe9f6a0850f5ae51` |
-| 30 minutes | `reactive-network-cron-30min`   | `0xdd28b4975b796a4118a568621c33b661dc1184b5ab53b97f894920fecc8f9409` |
-| 1 hour     | `reactive-network-cron-1hr`     | `0x1c0a1b9e81bd760da4242b10e7a82d11ddfba3691c444fb8c451375f6642c1bd` |
-| 6 hours    | `reactive-network-cron-6hr`     | `0x42da5f3b2a4fba938334bf220a817e1114d20f016647ba21bc137d7184d35eb5` |
-| 24 hours   | `reactive-network-cron-24hr`    | `0xdc9b69ea20fe15b408d4b8001a11811444022199c88ab26b69fa62b356c96ab5` |
+| Event     | Interval          | Approx. Time | Topic 0                                                              |
+|-----------|-------------------|--------------|----------------------------------------------------------------------|
+| Cron1     | Every block       | ~7 seconds   | `0xf02d6ea5c22a71cffe930a4523fcb4f129be6c804db50e4202fb4e0b07ccb514` |
+| Cron10    | Every 10 blocks   | ~1 minute    | `0x04463f7c1651e6b9774d7f85c85bb94654e3c46ca79b0c16fb16d4183307b687` |
+| Cron100   | Every 100 blocks  | ~12 minutes  | `0xb49937fb8970e19fd46d48f7e3fb00d659deac0347f79cd7cb542f0fc1503c70` |
+| Cron1000  | Every 1000 blocks | ~2 hours     | `0xe20b31294d84c3661ddc8f423abb9c70310d0cf172aa2714ead78029b325e3f4` |
+| Cron10000 | Every 10000 blocks| ~28 hours    | `0xd214e1d84db704ed42d37f538ea9bf71e44ba28bc1cc088b2f5deca654677a56` |
 
 - When a cron fires: `log._contract == address(service)` and `log.topic_0 == cronTopic`
 - Subscribe with: `service.subscribe(block.chainid, address(service), cronTopic, REACTIVE_IGNORE, REACTIVE_IGNORE, REACTIVE_IGNORE)`
-- Use the hash directly as a `uint256` constant in Solidity (already a 32-byte value)
+- Use the hash directly as a `uint256` constant in Solidity
+- These are the ONLY cron intervals available — there are no custom intervals
 
 ---
 

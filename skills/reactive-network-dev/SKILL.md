@@ -31,17 +31,15 @@ Before writing any code, answer these questions:
 1. **Origin chain** — Which chain(s) do the trigger events come from? What are the event signatures? Compute `topic_0 = keccak256("EventName(type1,type2,...)")`.
 2. **Destination chain** — Where does execution happen? What is the CC address? (Known at deploy time or passed as constructor arg.)
 3. **Network tier** — Mainnet or testnet? Do not mix. Use Lasna Testnet (5318007) + Sepolia/Base Sepolia for testnet. Use Reactive Mainnet (1597) + Base/Ethereum/etc. for mainnet.
-4. **Cron** — Does the RC need periodic triggering? If yes, use one of these topic hashes:
+4. **Cron** — Does the RC need periodic triggering? If yes, pick one of these 5 block-interval cron topics (these are the ONLY options):
 
-   | Interval   | Topic Hash                                                             |
-   |------------|------------------------------------------------------------------------|
-   | 1 minute   | `0x10f4e58e062105477d72f60b69049586448b6c43bf40e7c334b1093b0e965d57`  |
-   | 5 minutes  | `0x397d353798eb2ffcee4f62aad18906fd441cb6813b7d145398d4f170b6b976c2`  |
-   | 10 minutes | `0x920d4adf25816805d3fbf353ccffae0c45c9e96e0f300652fe9f6a0850f5ae51`  |
-   | 30 minutes | `0xdd28b4975b796a4118a568621c33b661dc1184b5ab53b97f894920fecc8f9409`  |
-   | 1 hour     | `0x1c0a1b9e81bd760da4242b10e7a82d11ddfba3691c444fb8c451375f6642c1bd`  |
-   | 6 hours    | `0x42da5f3b2a4fba938334bf220a817e1114d20f016647ba21bc137d7184d35eb5`  |
-   | 24 hours   | `0xdc9b69ea20fe15b408d4b8001a11811444022199c88ab26b69fa62b356c96ab5`  |
+   | Event     | Interval          | Approx. Time | Topic 0                                                              |
+   |-----------|-------------------|--------------|----------------------------------------------------------------------|
+   | Cron1     | Every block       | ~7 sec       | `0xf02d6ea5c22a71cffe930a4523fcb4f129be6c804db50e4202fb4e0b07ccb514` |
+   | Cron10    | Every 10 blocks   | ~1 min       | `0x04463f7c1651e6b9774d7f85c85bb94654e3c46ca79b0c16fb16d4183307b687` |
+   | Cron100   | Every 100 blocks  | ~12 min      | `0xb49937fb8970e19fd46d48f7e3fb00d659deac0347f79cd7cb542f0fc1503c70` |
+   | Cron1000  | Every 1000 blocks | ~2 hr        | `0xe20b31294d84c3661ddc8f423abb9c70310d0cf172aa2714ead78029b325e3f4` |
+   | Cron10000 | Every 10000 blocks| ~28 hr       | `0xd214e1d84db704ed42d37f538ea9bf71e44ba28bc1cc088b2f5deca654677a56` |
 
    Cron topic is **immutable** — set it in the constructor and never change it.
 5. **RC state** — What does the RC need to remember? Keep it minimal. All state must be initialized in the constructor; `react()` will never see state written by later transactions.
@@ -53,7 +51,7 @@ Before writing any code, answer these questions:
 
 > **Import paths:** Use `"reactive-lib/src/..."` with a remapping in `foundry.toml` or `remappings.txt`. See `references/deployment.md` Step 0 for setup.
 >
-> **Hash verification:** Always verify topic_0 hashes with `cast keccak "EventName(type1,type2)"` — do NOT use Node.js `crypto.createHash('sha3-256')` (that's NIST SHA3, not Ethereum's keccak256).
+> **Event topic hashes:** Verify event topic_0 hashes with `cast keccak "EventName(type1,type2)"`. Do NOT use Node.js `crypto.createHash('sha3-256')` (that's NIST SHA3, not Ethereum's keccak256). **Cron topic hashes are protocol-defined constants** — do not try to compute them, use the values from the table in Section 2.
 
 ```solidity
 // SPDX-License-Identifier: GPL-2.0-or-later
