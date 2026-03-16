@@ -1,10 +1,10 @@
 # reactive-network-dev
 
-A Claude Code plugin/skill that teaches Claude how to design and implement **Reactive Network** smart contract systems — the two-contract architecture (RC + CC) for cross-chain event-driven automation.
+A Claude Code skill that teaches Claude how to design and implement **Reactive Network** smart contract systems — the two-contract architecture (RC + CC) for cross-chain event-driven automation.
 
 ## What This Does
 
-When installed as a Claude Code plugin, Claude gains deep knowledge of:
+When installed, Claude gains deep knowledge of:
 
 - **Reactive Contract (RC) patterns** — `react()` routing, self-callbacks, lazy cron subscription, subscription management, the frozen ReactVM state model
 - **Callback Contract (CC) patterns** — `authorizedSenderOnly` entry points, try-catch isolation, lifecycle events, auto-cancel on consecutive failures
@@ -16,28 +16,66 @@ When installed as a Claude Code plugin, Claude gains deep knowledge of:
 
 ## Installation
 
-### As a Claude Code Plugin
+### Option A: Global Skill (recommended — works for all projects)
+
+Clone the repo and symlink the skill directory into your Claude config's `skills/` folder:
 
 ```bash
-# From your project directory, or globally:
-claude plugins add /path/to/reactive-network-dev
+# Clone the repo anywhere you like
+git clone https://github.com/harshkas4na/reactive-network-dev.git
+cd reactive-network-dev
+
+# Find your Claude config directory:
+#   Default:         ~/.claude
+#   Custom (common): check if you have CLAUDE_CONFIG_DIR set in your shell aliases
+#   Example:         ~/.claude-work, ~/.claude-personal, etc.
+#
+# To check: run `alias | grep claude` — look for CLAUDE_CONFIG_DIR=<path>
+
+# Create the global skills directory (replace ~/.claude with YOUR config dir)
+mkdir -p ~/.claude/skills
+
+# Symlink the skill into it
+ln -s "$(pwd)/skills/reactive-network-dev" ~/.claude/skills/reactive-network-dev
 ```
 
-Or add to your Claude Code settings:
+> **Custom config dirs:** If you use aliases like `claude-work` or `claude-personal` that set `CLAUDE_CONFIG_DIR`, put the symlink in THAT directory's `skills/` folder. Example: if your alias sets `CLAUDE_CONFIG_DIR=~/.claude-work`, then: `mkdir -p ~/.claude-work/skills && ln -s "$(pwd)/skills/reactive-network-dev" ~/.claude-work/skills/reactive-network-dev`
 
-```json
-{
-  "plugins": [
-    "/path/to/reactive-network-dev"
-  ]
-}
-```
+### Option B: Project-Local Skill (only available in one project)
 
-### As a Git-based Plugin
+If you only want the skill in a specific project:
 
 ```bash
-claude plugins add https://github.com/<your-org>/reactive-network-dev.git
+# From your project root
+mkdir -p .claude/skills
+ln -s /path/to/reactive-network-dev/skills/reactive-network-dev .claude/skills/reactive-network-dev
 ```
+
+### Option C: Plugin Mode (per-session, for testing)
+
+```bash
+claude --plugin-dir /path/to/reactive-network-dev
+```
+
+## Verify Installation
+
+After installing, **start a new Claude Code session** (skills load at session start):
+
+```bash
+claude
+```
+
+Then type `/` and look for `reactive-network-dev` in the autocomplete list. If you see it, the skill is loaded.
+
+You can also trigger it directly:
+
+```
+> /reactive-network-dev
+```
+
+Or just ask Claude naturally — it auto-triggers on phrases like "write a reactive contract", "create an RC system", etc.
+
+> **Note:** `claude plugins list` does NOT show standalone skills. Skills installed in `~/.claude/skills/` or `.claude/skills/` are loaded silently at session start. The `/` autocomplete menu is the way to verify them.
 
 ## Usage
 
@@ -62,7 +100,7 @@ skills/reactive-network-dev/
     cc-patterns.md                      # CC entry points, try-catch, lifecycle events
     gotchas.md                          # 12 critical pitfalls with code examples
   examples/
-    BasicDemoReactive.sol               # Minimal hello-world RC (Ping → Pong)
+    BasicDemoReactive.sol               # Minimal hello-world RC (Ping -> Pong)
     BasicDemoCallback.sol               # Minimal hello-world CC
     UniswapDemoStopOrderReactive.sol    # Event-triggered Uniswap stop-order RC
     UniswapDemoStopOrderCallback.sol    # Uniswap swap execution CC

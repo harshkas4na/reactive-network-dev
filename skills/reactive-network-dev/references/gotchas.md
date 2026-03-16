@@ -304,28 +304,44 @@ Faucet addresses:
 
 ---
 
-## Gotcha 12: RVM ID is Your Deployer Address
+## Gotcha 12: `_callbackSender` is the Chain-Specific Callback Proxy, NOT Your Wallet
 
-**The rule:** The RVM ID (passed to the CC's `AbstractCallback` constructor as `_callbackSender`) is simply the **EOA address used to deploy the RC**. It is not a separate identifier to look up.
+**The rule:** The `_callbackSender` passed to `AbstractCallback` in the CC constructor is the **Callback Proxy address for the destination chain where the CC is deployed**. Each chain has its own proxy. This is NOT your wallet address, NOT the RC address, NOT an "RVM ID".
 
 **What breaks:**
 ```solidity
-// BAD — using the RC's deployed contract address
-constructor(address _callbackSender) AbstractCallback(_callbackSender) {}
-// deployed with: --constructor-args $OWNER $RC_CONTRACT_ADDRESS
-// ↑ Wrong. The CC rejects all callbacks because RVM ID ≠ RC address.
+// BAD — passing deployer wallet address
+constructor(address _owner, address _callbackSender) AbstractCallback(_callbackSender) {}
+// deployed with: --constructor-args $OWNER $MY_WALLET_ADDRESS
+// ↑ WRONG. authorizedSenderOnly rejects all callbacks because msg.sender is the proxy, not your wallet.
 ```
 
-**Fix:**
+**Fix — use the Callback Proxy for the chain:**
 ```bash
-# Deploy CC with the wallet address that will deploy the RC
+# CC deployed on Sepolia → use Sepolia's Callback Proxy
+SEPOLIA_CALLBACK_PROXY=0xc9f36411C9897e7F959D99ffca2a0Ba7ee0D7bDA
+
 forge create src/MyCallback.sol:MyCallback \
-  --constructor-args $OWNER $DEPLOYER_WALLET_ADDRESS \
+  --constructor-args $OWNER $SEPOLIA_CALLBACK_PROXY \
   --rpc-url $SEPOLIA_RPC \
-  --private-key $SEPOLIA_PRIVATE_KEY
+  --private-key $PRIVATE_KEY
 ```
 
-If you accidentally use a different deployer address for the RC than you passed to the CC, the CC will silently reject all callbacks from `authorizedSenderOnly`.
+**Common Callback Proxy addresses:**
+
+| Destination Chain | Callback Proxy                               |
+|-------------------|----------------------------------------------|
+| Reactive (both)   | `0x0000000000000000000000000000000000fffFfF`  |
+| Ethereum Sepolia  | `0xc9f36411C9897e7F959D99ffca2a0Ba7ee0D7bDA`  |
+| Base Sepolia      | `0xa6eA49Ed671B8a4dfCDd34E36b7a75Ac79B8A5a6`  |
+| Unichain Sepolia  | `0x9299472A6399Fd1027ebF067571Eb3e3D7837FC4`  |
+| Ethereum Mainnet  | `0x1D5267C1bb7D8bA68964dDF3990601BDB7902D76`  |
+| Base Mainnet      | `0x0D3E76De6bC44309083cAAFdB49A088B8a250947`  |
+| Arbitrum          | `0x4730c58FDA9d78f60c987039aEaB7d261aAd942E`  |
+
+See `references/architecture.md` for the full table.
+
+**How we discovered this:** CC deployed on Sepolia with deployer wallet as `_callbackSender`. Every callback from the RC was silently rejected by `authorizedSenderOnly` because `msg.sender` was the Sepolia Callback Proxy (`0xc9f3...`), not our wallet. No revert message visible — callbacks just disappeared.
 
 ---
 

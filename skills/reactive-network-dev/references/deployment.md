@@ -46,7 +46,7 @@ This allows you to import with `import "reactive-lib/src/..."` in your contracts
 # Your deployer wallet private key (same key for all networks recommended)
 export PRIVATE_KEY=<your_private_key>
 
-# Derive your wallet address (this is also your RVM ID)
+# Derive your wallet address (used as owner for CC and RC)
 export DEPLOYER_ADDR=$(cast wallet address --private-key $PRIVATE_KEY)
 
 # Reactive Lasna Testnet (RC lives here)
@@ -59,7 +59,7 @@ export SEPOLIA_RPC=<your_sepolia_rpc_url>
 export BASE_SEPOLIA_RPC=<your_base_sepolia_rpc_url>
 ```
 
-> **Use the same private key for all networks.** RVM ID = deployer wallet address. Using the same key everywhere means your `$DEPLOYER_ADDR` is your RVM ID on every chain.
+> **Using the same private key for all networks** keeps things simple — one `$DEPLOYER_ADDR` as owner on every chain.
 
 ---
 
@@ -89,15 +89,26 @@ lREACT appears in your wallet on Lasna Testnet (chain ID 5318007) after a few co
 
 Deploy first — you need the CC address as a constructor argument for the RC.
 
+Each destination chain has a **Callback Proxy** address that delivers callbacks to your CC. You must pass the correct proxy for the chain you're deploying to:
+
 ```bash
+# Callback Proxy addresses (pass as _callbackSender to AbstractCallback):
+# Sepolia:          0xc9f36411C9897e7F959D99ffca2a0Ba7ee0D7bDA
+# Base Sepolia:     0xa6eA49Ed671B8a4dfCDd34E36b7a75Ac79B8A5a6
+# Unichain Sepolia: 0x9299472A6399Fd1027ebF067571Eb3e3D7837FC4
+# (See references/architecture.md for full table)
+
+# Example: deploying CC on Sepolia
+export CALLBACK_PROXY=0xc9f36411C9897e7F959D99ffca2a0Ba7ee0D7bDA
+
 forge create src/MyCallback.sol:MyCallback \
-  --constructor-args $DEPLOYER_ADDR $DEPLOYER_ADDR \
+  --constructor-args $DEPLOYER_ADDR $CALLBACK_PROXY \
   --rpc-url $SEPOLIA_RPC \
   --private-key $PRIVATE_KEY
 ```
 
 - First arg: `owner` — who can manage the CC (your wallet)
-- Second arg: `_callbackSender` — the RVM ID (your wallet address, same as deployer)
+- Second arg: `_callbackSender` — the **Callback Proxy** for this destination chain (NOT your wallet)
 
 ```bash
 # Save the deployed address from the output
@@ -149,9 +160,11 @@ Check the contract status:
 A complete walkthrough using the BasicDemo example contracts:
 
 ```bash
-# 1. Deploy BasicDemoCallback on Sepolia
+# 1. Deploy BasicDemoCallback on Sepolia (use Sepolia's Callback Proxy)
+export SEPOLIA_CALLBACK_PROXY=0xc9f36411C9897e7F959D99ffca2a0Ba7ee0D7bDA
+
 forge create src/BasicDemoCallback.sol:BasicDemoCallback \
-  --constructor-args $DEPLOYER_ADDR $DEPLOYER_ADDR \
+  --constructor-args $DEPLOYER_ADDR $SEPOLIA_CALLBACK_PROXY \
   --rpc-url $SEPOLIA_RPC \
   --private-key $PRIVATE_KEY
 

@@ -161,20 +161,22 @@ Base class for CC contracts.
 
 ```solidity
 abstract contract AbstractCallback {
-    address private _callbackSender; // The RVM ID of the paired RC
+    address private _callbackSender; // The Callback Proxy for this destination chain
 
     constructor(address callbackSender) {
         _callbackSender = callbackSender;
     }
 
-    // Checks: msg.sender == RN_CALLBACK_PROXY AND injected sender == _callbackSender
+    // Checks: msg.sender == _callbackSender (the chain's Callback Proxy)
     modifier authorizedSenderOnly() { ... }
 }
 ```
 
-- `_callbackSender` is the **RVM ID** — this is the **EOA address** (wallet) used to deploy the RC on the Reactive Network
-- It is NOT the RC's deployed contract address — it is your deployer wallet address
-- If deploying RC and CC from the same wallet, pass that wallet address as `_callbackSender`
+- `_callbackSender` is the **Callback Proxy address** for the chain where the CC is deployed
+- Each destination chain has its own Callback Proxy — see the Chain IDs table below
+- Example: CC on Sepolia → pass `0xc9f36411C9897e7F959D99ffca2a0Ba7ee0D7bDA`
+- Example: CC on Base Mainnet → pass `0x0D3E76De6bC44309083cAAFdB49A088B8a250947`
+- **This is NOT your wallet address or the RC's address** — it is a protocol-level proxy per chain
 
 ---
 
@@ -204,41 +206,51 @@ address constant SERVICE_ADDR     = 0x0000000000000000000000000000000000FFFFFF;
 
 ---
 
-## Chain IDs
+## Chain IDs & Callback Proxies
 
-### Reactive Network
-
-| Network              | Chain ID   | RPC                              |
-|----------------------|------------|----------------------------------|
-| Reactive Mainnet     | 1597       | `https://mainnet-rpc.rnk.dev/`   |
-| Lasna Testnet        | 5318007    | `https://lasna-rpc.rnk.dev/`     |
+Each destination chain has a **Callback Proxy** address — this is the address that delivers callbacks to your CC. Pass it as `_callbackSender` when deploying `AbstractCallback`.
 
 > **Kopli is deprecated.** Use Lasna Testnet for all new development.
 
-### Destination Chains — Mainnet
+### Mainnet Chains
 
-| Network          | Chain ID |
-|------------------|----------|
-| Ethereum Mainnet | 1        |
-| Base Mainnet     | 8453     |
-| Arbitrum One     | 42161    |
-| Optimism         | 10       |
-| Polygon          | 137      |
-| HyperEVM         | 999      |
-| Abstract         | 2741     |
-| Sonic            | 146      |
-| Soneium          | 1868     |
-| Unichain         | 130      |
+| Chain        | Chain ID | Origin | Dest | Callback Proxy                               |
+|--------------|----------|--------|------|----------------------------------------------|
+| Reactive     | 1597     | yes    | yes  | `0x0000000000000000000000000000000000fffFfF`  |
+| Ethereum     | 1        | yes    | yes  | `0x1D5267C1bb7D8bA68964dDF3990601BDB7902D76`  |
+| Base         | 8453     | yes    | yes  | `0x0D3E76De6bC44309083cAAFdB49A088B8a250947`  |
+| Arbitrum     | 42161    | yes    | yes  | `0x4730c58FDA9d78f60c987039aEaB7d261aAd942E`  |
+| Avalanche    | 43114    | yes    | yes  | `0x934Ea75496562D4e83E80865c33dbA600644fCDa`  |
+| BSC          | 56       | yes    | yes  | `0xdb81A196A0dF9Ef974C9430495a09B6d535fAc48`  |
+| Abstract     | 2741     | yes    | yes  | `0x9299472A6399Fd1027ebF067571Eb3e3D7837FC4`  |
+| HyperEVM     | 999      | yes    | yes  | `0x9299472A6399Fd1027ebF067571Eb3e3D7837FC4`  |
+| Linea        | 59144    | yes    | yes  | `0x9299472A6399Fd1027ebF067571Eb3e3D7837FC4`  |
+| Plasma       | 9745     | yes    | yes  | `0x9299472A6399Fd1027ebF067571Eb3e3D7837FC4`  |
+| Sonic        | 146      | yes    | yes  | `0x9299472A6399Fd1027ebF067571Eb3e3D7837FC4`  |
+| Unichain     | 130      | yes    | yes  | `0x9299472A6399Fd1027ebF067571Eb3e3D7837FC4`  |
 
-### Destination Chains — Testnet
+### Testnet Chains
 
-| Network          | Chain ID   |
-|------------------|------------|
-| Sepolia          | 11155111   |
-| Base Sepolia     | 84532      |
-| Unichain Sepolia | 1301       |
+| Chain            | Chain ID   | Origin | Dest | Callback Proxy                               |
+|------------------|------------|--------|------|----------------------------------------------|
+| Reactive Lasna   | 5318007    | yes    | yes  | `0x0000000000000000000000000000000000fffFfF`  |
+| Ethereum Sepolia | 11155111   | yes    | yes  | `0xc9f36411C9897e7F959D99ffca2a0Ba7ee0D7bDA`  |
+| Base Sepolia     | 84532      | yes    | yes  | `0xa6eA49Ed671B8a4dfCDd34E36b7a75Ac79B8A5a6`  |
+| Unichain Sepolia | 1301       | yes    | yes  | `0x9299472A6399Fd1027ebF067571Eb3e3D7837FC4`  |
+| Avalanche Fuji   | 43113      | yes    | no   | —                                            |
+| BSC Testnet      | 97         | yes    | no   | —                                            |
+| Polygon Amoy     | 80002      | yes    | no   | —                                            |
 
-> **Critical:** Mainnet and testnet chains cannot be mixed. Lasna Testnet RC can only deliver callbacks to testnet destination chains. Reactive Mainnet RC can only deliver callbacks to mainnet destination chains.
+### RPC Endpoints
+
+| Network          | RPC                              |
+|------------------|----------------------------------|
+| Reactive Mainnet | `https://mainnet-rpc.rnk.dev/`   |
+| Reactive Lasna   | `https://lasna-rpc.rnk.dev/`     |
+
+> **Critical:** Mainnet and testnet chains cannot be mixed. If the origin is a testnet, the destination must also be a testnet.
+>
+> **Origin-only chains** (Avalanche Fuji, BSC Testnet, Polygon Amoy) can be monitored for events but cannot receive callbacks.
 
 ---
 

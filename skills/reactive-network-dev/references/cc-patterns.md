@@ -8,20 +8,26 @@ import "reactive-lib/src/abstract-base/AbstractCallback.sol";
 contract MyCallback is AbstractCallback {
     constructor(
         address _owner,
-        address _callbackSender   // The RVM ID of the paired RC
+        address _callbackSender   // Callback Proxy address for this destination chain
     ) payable AbstractCallback(_callbackSender) {
         owner = _owner;
     }
 }
 ```
 
-**Important:** `_callbackSender` is the **RVM ID**, not the RC's deployment address. These are different. The RVM ID is derivable from the RC address using RN tooling, or visible in the deployment receipt.
+**Important:** `_callbackSender` is the **Callback Proxy address** for the specific chain where the CC is deployed. Each chain has its own proxy:
+- Sepolia: `0xc9f36411C9897e7F959D99ffca2a0Ba7ee0D7bDA`
+- Base Sepolia: `0xa6eA49Ed671B8a4dfCDd34E36b7a75Ac79B8A5a6`
+- Base Mainnet: `0x0D3E76De6bC44309083cAAFdB49A088B8a250947`
+- Reactive (mainnet & testnet): `0x0000000000000000000000000000000000fffFfF`
+- See `references/architecture.md` for the full table.
+
+This is NOT your wallet address or the RC's address. It is a protocol-level proxy per chain.
 
 `AbstractCallback` provides the `authorizedSenderOnly` modifier:
 ```solidity
 modifier authorizedSenderOnly() {
-    // Checks: msg.sender == RN_CALLBACK_PROXY
-    // AND: the injected first argument (sender) == _callbackSender (RVM ID)
+    // Checks: msg.sender == _callbackSender (the chain's Callback Proxy)
     _;
 }
 ```
@@ -275,7 +281,7 @@ contract MyCallback is AbstractCallback {
         _;
     }
 
-    constructor(address _owner, address _callbackSender)
+    constructor(address _owner, address _callbackSender)  // _callbackSender = Callback Proxy for this chain
         payable AbstractCallback(_callbackSender)
     {
         owner = _owner;

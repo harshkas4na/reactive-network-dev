@@ -260,7 +260,7 @@ contract MyCallback is AbstractCallback {
 
     constructor(
         address _owner,
-        address _callbackSender   // RVM ID — passed as _callbackSender to AbstractCallback
+        address _callbackSender   // Callback Proxy address for this destination chain
     ) payable AbstractCallback(_callbackSender) {
         owner = _owner;
     }
@@ -271,8 +271,8 @@ contract MyCallback is AbstractCallback {
     }
 
     // ── Main entry point from RC ─────────────────────────────────────────────
-    // authorizedSenderOnly checks that msg.sender is the RN callback proxy
-    // and that the injected sender (first arg) matches the RVM ID.
+    // authorizedSenderOnly checks that msg.sender is the chain's Callback Proxy
+    // (which was passed as _callbackSender to AbstractCallback in the constructor).
     function doWork(address /* sender */) external authorizedSenderOnly {
         uint256 executed = 0;
         uint256 checked = 0;
@@ -321,7 +321,7 @@ contract MyCallback is AbstractCallback {
 8. **Constructor must be `payable`** — RC needs ETH for callback delivery costs.
 9. **Minimum callback gas is 100,000** — always set `CALLBACK_GAS_LIMIT` to at least 100,000. Use 1,000,000–2,000,000 for complex CC logic.
 10. **Never mix mainnet and testnet** — Lasna Testnet RC can only call testnet chains; Reactive Mainnet RC can only call mainnet chains.
-11. **RVM ID = your deployer wallet address** — the `_callbackSender` arg passed to `AbstractCallback` in the CC constructor is the EOA address you use to deploy the RC, not the RC's contract address.
+11. **`_callbackSender` = the Callback Proxy for the destination chain** — each chain has a specific Callback Proxy address that delivers callbacks to CCs. Pass that chain's proxy as `_callbackSender` to `AbstractCallback`. Example: CC on Sepolia → `0xc9f36411C9897e7F959D99ffca2a0Ba7ee0D7bDA`. CC on Base → `0x0D3E76De6bC44309083cAAFdB49A088B8a250947`. See `references/architecture.md` for the full table. This is NOT your wallet address.
 
 > See `references/gotchas.md` for full details with debugging context.
 
@@ -352,7 +352,7 @@ contract MyCallback is AbstractCallback {
 
 0. **Decide network tier** — testnet (Lasna + Sepolia/Base Sepolia) or mainnet (Reactive + Base/ETH/etc.). Never mix.
 1. **Define the event surface** — list all events the RC subscribes to (origin chain) and all lifecycle events the CC emits (feedback loop).
-2. **Deploy CC first** — it's a normal Solidity contract with no RN dependencies except `AbstractCallback`. Pass your deployer wallet address as `_callbackSender` (that's the RVM ID). Save the CC address.
+2. **Deploy CC first** — it's a normal Solidity contract with no RN dependencies except `AbstractCallback`. Pass the **Callback Proxy address** for the destination chain as `_callbackSender` (see `references/architecture.md` for the per-chain table). Save the CC address.
 3. **Derive topic_0 constants** — Use `cast keccak "EventSignature(type1,type2,...)"` for each event the RC needs. Never use Node.js SHA3-256 — it produces wrong hashes.
 4. **Write and deploy the RC** — constructor subscriptions, `react()` routing, self-callback helpers, `callbackOnly` persist functions, `getPausableSubscriptions()`. Deploy with `--value` to pre-fund callback delivery.
 5. **Verify the state model** — for each piece of RC state, ask: "Does `react()` need to read this?" If yes, it must be `immutable` or set in the constructor. If no, it's fine as mutable (written by `callbackOnly`).

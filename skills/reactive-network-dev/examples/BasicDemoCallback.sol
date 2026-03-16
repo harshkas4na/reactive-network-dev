@@ -24,7 +24,9 @@ contract BasicDemoCallback is AbstractCallback {
     // ── Constructor ───────────────────────────────────────────────────────────
 
     /// @param _owner           Owner of this contract.
-    /// @param _callbackSender  RVM ID — the EOA address used to deploy the RC.
+    /// @param _callbackSender  Callback Proxy address for the chain this CC is deployed on.
+    ///                         Sepolia: 0xc9f36411C9897e7F959D99ffca2a0Ba7ee0D7bDA
+    ///                         Base Sepolia: 0xa6eA49Ed671B8a4dfCDd34E36b7a75Ac79B8A5a6
     constructor(address _owner, address _callbackSender)
         payable AbstractCallback(_callbackSender)
     {
