@@ -1,0 +1,6 @@
+{
+  "name": "reactive-network-dev",
+  "version": "1.0.0",
+  "description": "Skill for designing and writing Reactive Network smart contract systems (RC + Callback Contract pairs)",
+  "author": { "name": "Harsh Kasana" }
+}
