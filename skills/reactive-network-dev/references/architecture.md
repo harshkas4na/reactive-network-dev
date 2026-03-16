@@ -171,9 +171,9 @@ abstract contract AbstractCallback {
 }
 ```
 
-- `_callbackSender` is the **RVM ID** of the RC, not the RC's deploy address
-- The RVM ID is deterministic from the RC's deploy address but distinct from it
-- Pass the RVM ID (obtained from the RC's deployment receipt or from RN tooling) as `_callbackSender`
+- `_callbackSender` is the **RVM ID** — this is the **EOA address** (wallet) used to deploy the RC on the Reactive Network
+- It is NOT the RC's deployed contract address — it is your deployer wallet address
+- If deploying RC and CC from the same wallet, pass that wallet address as `_callbackSender`
 
 ---
 
@@ -205,27 +205,131 @@ address constant SERVICE_ADDR     = 0x0000000000000000000000000000000000FFFFFF;
 
 ## Chain IDs
 
-| Network              | Chain ID   |
-|----------------------|------------|
-| Reactive Network     | 1597       |
-| Base Mainnet         | 8453       |
-| Sepolia              | 11155111   |
-| Ethereum Mainnet     | 1          |
-| Arbitrum One         | 42161      |
-| Optimism             | 10         |
-| Polygon              | 137        |
+### Reactive Network
+
+| Network              | Chain ID   | RPC                              |
+|----------------------|------------|----------------------------------|
+| Reactive Mainnet     | 1597       | `https://mainnet-rpc.rnk.dev/`   |
+| Lasna Testnet        | 5318007    | `https://lasna-rpc.rnk.dev/`     |
+
+> **Kopli is deprecated.** Use Lasna Testnet for all new development.
+
+### Destination Chains — Mainnet
+
+| Network          | Chain ID |
+|------------------|----------|
+| Ethereum Mainnet | 1        |
+| Base Mainnet     | 8453     |
+| Arbitrum One     | 42161    |
+| Optimism         | 10       |
+| Polygon          | 137      |
+| HyperEVM         | 999      |
+| Abstract         | 2741     |
+| Sonic            | 146      |
+| Soneium          | 1868     |
+| Unichain         | 130      |
+
+### Destination Chains — Testnet
+
+| Network          | Chain ID   |
+|------------------|------------|
+| Sepolia          | 11155111   |
+| Base Sepolia     | 84532      |
+| Unichain Sepolia | 1301       |
+
+> **Critical:** Mainnet and testnet chains cannot be mixed. Lasna Testnet RC can only deliver callbacks to testnet destination chains. Reactive Mainnet RC can only deliver callbacks to mainnet destination chains.
 
 ---
 
 ## Cron Topics
 
-Cron topics are keccak256 hashes of cron schedule strings. Common ones:
+Cron topics are keccak256 hashes of fixed cron schedule strings:
 
-| Interval  | Topic Hash (keccak256)                                                             |
-|-----------|------------------------------------------------------------------------------------|
-| 1 minute  | `keccak256("reactive-network-cron-1min")`   — verify exact string with RN docs    |
-| 5 minutes | `keccak256("reactive-network-cron-5min")`                                          |
-| 1 hour    | `keccak256("reactive-network-cron-1h")`                                            |
+| Interval   | String                          | Topic Hash                                                           |
+|------------|---------------------------------|----------------------------------------------------------------------|
+| 1 minute   | `reactive-network-cron-1min`    | `0x10f4e58e062105477d72f60b69049586448b6c43bf40e7c334b1093b0e965d57` |
+| 5 minutes  | `reactive-network-cron-5min`    | `0x397d353798eb2ffcee4f62aad18906fd441cb6813b7d145398d4f170b6b976c2` |
+| 10 minutes | `reactive-network-cron-10min`   | `0x920d4adf25816805d3fbf353ccffae0c45c9e96e0f300652fe9f6a0850f5ae51` |
+| 30 minutes | `reactive-network-cron-30min`   | `0xdd28b4975b796a4118a568621c33b661dc1184b5ab53b97f894920fecc8f9409` |
+| 1 hour     | `reactive-network-cron-1hr`     | `0x1c0a1b9e81bd760da4242b10e7a82d11ddfba3691c444fb8c451375f6642c1bd` |
+| 6 hours    | `reactive-network-cron-6hr`     | `0x42da5f3b2a4fba938334bf220a817e1114d20f016647ba21bc137d7184d35eb5` |
+| 24 hours   | `reactive-network-cron-24hr`    | `0xdc9b69ea20fe15b408d4b8001a11811444022199c88ab26b69fa62b356c96ab5` |
 
 - When a cron fires: `log._contract == address(service)` and `log.topic_0 == cronTopic`
 - Subscribe with: `service.subscribe(block.chainid, address(service), cronTopic, REACTIVE_IGNORE, REACTIVE_IGNORE, REACTIVE_IGNORE)`
+- Use the hash directly as a `uint256` constant in Solidity (already a 32-byte value)
+
+---
+
+## Economics
+
+### Fee Formula
+
+- **RC execution fee:** `fee = BaseFee × GasUsed` (charged from RC's on-chain ETH balance)
+- **Cross-chain callback fee:** `p_callback = p_base × C × (g_callback + K)`
+  - `C` = destination chain coefficient (varies by chain)
+  - `g_callback` = gas limit specified in the `Callback` event
+  - `K` = fixed surcharge per callback
+
+### Gas Limits
+
+| Parameter              | Value     | Notes                                               |
+|------------------------|-----------|-----------------------------------------------------|
+| Min callback gas limit | 100,000   | System enforces this; lower values are raised/rejected |
+| Max RC gas limit       | 900,000   | Hard cap per `react()` invocation                   |
+| Recommended CC gas     | 1,000,000–2,000,000 | For complex CC logic                      |
+
+### Contract Status
+
+- `active` — RC has sufficient ETH balance; callbacks are delivered
+- `blocklisted` — RC has run out of ETH; no callbacks delivered until funded
+
+Monitor status at: `https://lasna.reactscan.net/address/<RC_ADDRESS>` (testnet) or `https://reactscan.net/address/<RC_ADDRESS>` (mainnet)
+
+---
+
+## Multi-Chain Subscription Patterns
+
+```solidity
+// Subscribe to all chains (chain_id = 0 = wildcard)
+service.subscribe(0, specificContract, specificTopic, REACTIVE_IGNORE, REACTIVE_IGNORE, REACTIVE_IGNORE);
+
+// Subscribe to all contracts on a chain (_contract = address(0) = wildcard)
+service.subscribe(SEPOLIA_CHAIN_ID, address(0), specificTopic, REACTIVE_IGNORE, REACTIVE_IGNORE, REACTIVE_IGNORE);
+```
+
+**Constraint:** At least one of `(chain_id, _contract, topic_0)` must be non-zero (non-wildcard). Subscribing with all three as wildcards is rejected.
+
+---
+
+## DIA Oracle Integration
+
+DIA provides price feeds on Base Mainnet that emit events on >1% price change OR every 24 hours (minimum).
+
+**Oracle contract (Base Mainnet):** `0x5612599CF48032d7428399d5Fcb99eDcc75c06A7`
+
+**Price update event:**
+```solidity
+// DIA emits this on price changes
+event OracleUpdate(string key, uint128 value, uint128 timestamp);
+```
+
+**RC subscription pattern:**
+```solidity
+// keccak256("OracleUpdate(string,uint128,uint128)")
+uint256 private constant DIA_ORACLE_UPDATE_TOPIC_0 = ...; // compute with cast keccak
+
+// In constructor:
+if (!vm) {
+    service.subscribe(
+        8453,                    // Base Mainnet
+        0x5612599CF48032d7428399d5Fcb99eDcc75c06A7, // DIA oracle
+        DIA_ORACLE_UPDATE_TOPIC_0,
+        REACTIVE_IGNORE,
+        REACTIVE_IGNORE,
+        REACTIVE_IGNORE
+    );
+}
+```
+
+**In `react()`:** decode `log.data` to get the price key (e.g. `"ETH/USD"`), value (18-decimal fixed-point), and timestamp. Use these to trigger cross-chain actions when price conditions are met.

@@ -30,13 +30,30 @@ Before writing any code, answer these questions:
 
 1. **Origin chain** — Which chain(s) do the trigger events come from? What are the event signatures? Compute `topic_0 = keccak256("EventName(type1,type2,...)")`.
 2. **Destination chain** — Where does execution happen? What is the CC address? (Known at deploy time or passed as constructor arg.)
-3. **Cron** — Does the RC need periodic triggering? If yes, which cron topic? (Get cron topic hashes from RN docs or use `keccak256("reactive-network-cron-1min")` etc.) Cron topic is **immutable** — set it in the constructor and never change it.
-4. **RC state** — What does the RC need to remember? Keep it minimal. All state must be initialized in the constructor; `react()` will never see state written by later transactions.
-5. **CC lifecycle events** — What events does the CC emit that the RC needs to react to? Define these upfront; both sides need to agree on the signatures.
+3. **Network tier** — Mainnet or testnet? Do not mix. Use Lasna Testnet (5318007) + Sepolia/Base Sepolia for testnet. Use Reactive Mainnet (1597) + Base/Ethereum/etc. for mainnet.
+4. **Cron** — Does the RC need periodic triggering? If yes, use one of these topic hashes:
+
+   | Interval   | Topic Hash                                                             |
+   |------------|------------------------------------------------------------------------|
+   | 1 minute   | `0x10f4e58e062105477d72f60b69049586448b6c43bf40e7c334b1093b0e965d57`  |
+   | 5 minutes  | `0x397d353798eb2ffcee4f62aad18906fd441cb6813b7d145398d4f170b6b976c2`  |
+   | 10 minutes | `0x920d4adf25816805d3fbf353ccffae0c45c9e96e0f300652fe9f6a0850f5ae51`  |
+   | 30 minutes | `0xdd28b4975b796a4118a568621c33b661dc1184b5ab53b97f894920fecc8f9409`  |
+   | 1 hour     | `0x1c0a1b9e81bd760da4242b10e7a82d11ddfba3691c444fb8c451375f6642c1bd`  |
+   | 6 hours    | `0x42da5f3b2a4fba938334bf220a817e1114d20f016647ba21bc137d7184d35eb5`  |
+   | 24 hours   | `0xdc9b69ea20fe15b408d4b8001a11811444022199c88ab26b69fa62b356c96ab5`  |
+
+   Cron topic is **immutable** — set it in the constructor and never change it.
+5. **RC state** — What does the RC need to remember? Keep it minimal. All state must be initialized in the constructor; `react()` will never see state written by later transactions.
+6. **CC lifecycle events** — What events does the CC emit that the RC needs to react to? Define these upfront; both sides need to agree on the signatures.
 
 ---
 
 ## 3. RC Contract Template
+
+> **Import paths:** Use `"reactive-lib/src/..."` with a remapping in `foundry.toml` or `remappings.txt`. See `references/deployment.md` Step 0 for setup.
+>
+> **Hash verification:** Always verify topic_0 hashes with `cast keccak "EventName(type1,type2)"` — do NOT use Node.js `crypto.createHash('sha3-256')` (that's NIST SHA3, not Ethereum's keccak256).
 
 ```solidity
 // SPDX-License-Identifier: GPL-2.0-or-later
@@ -301,6 +318,9 @@ contract MyCallback is AbstractCallback {
 6. **`address(0)` in self-callbacks** — always use `address(0)` as the first parameter in `abi.encodeWithSignature(...)` for self-callbacks. RN replaces it with the actual RVM ID.
 7. **`if (!vm)` in constructor** — always wrap `service.subscribe()` calls with this guard.
 8. **Constructor must be `payable`** — RC needs ETH for callback delivery costs.
+9. **Minimum callback gas is 100,000** — always set `CALLBACK_GAS_LIMIT` to at least 100,000. Use 1,000,000–2,000,000 for complex CC logic.
+10. **Never mix mainnet and testnet** — Lasna Testnet RC can only call testnet chains; Reactive Mainnet RC can only call mainnet chains.
+11. **RVM ID = your deployer wallet address** — the `_callbackSender` arg passed to `AbstractCallback` in the CC constructor is the EOA address you use to deploy the RC, not the RC's contract address.
 
 > See `references/gotchas.md` for full details with debugging context.
 
@@ -308,16 +328,19 @@ contract MyCallback is AbstractCallback {
 
 ## 6. Reference Files
 
-- **`references/architecture.md`** — `LogRecord` struct, modifier system (`vmOnly`/`rnOnly`/`callbackOnly`), `ISystemContract` API, `AbstractPausableReactive`/`AbstractCallback` internals, payment infrastructure, chain IDs.
+- **`references/architecture.md`** — `LogRecord` struct, modifier system (`vmOnly`/`rnOnly`/`callbackOnly`), `ISystemContract` API, `AbstractPausableReactive`/`AbstractCallback` internals, payment infrastructure, chain IDs, cron topic hashes, fee economics, DIA oracle.
+- **`references/deployment.md`** — Step-by-step deployment guide: install, env vars, get lREACT, deploy CC, deploy RC, fund RC, verify on Reactscan.
 - **`references/rc-patterns.md`** — Constructor patterns, topic_0 computation, `react()` routing, self-callback for state persistence, lazy cron subscription, `getPausableSubscriptions()`, duplicate event guard.
 - **`references/cc-patterns.md`** — `AbstractCallback` inheritance, `authorizedSenderOnly` entry point, try-catch isolation, lifecycle events, consecutive failure + auto-cancel, retry cooldown, `CycleCompleted` guarantee.
-- **`references/gotchas.md`** — 8 critical pitfalls discovered through real debugging. Read before writing any RC.
+- **`references/gotchas.md`** — 12 critical pitfalls discovered through real debugging. Read before writing any RC.
 
 ---
 
 ## 7. Examples
 
-- **`examples/UniswapDemoStopOrderReactive.sol`** — Simple RC: monitors Uniswap V2 Sync events, triggers a stop-order swap when price crosses threshold. Good baseline for event-triggered RCs.
+- **`examples/BasicDemoReactive.sol`** — Minimal RC: subscribes to `Ping` events, dispatches a `pong()` callback. Start here for "hello world".
+- **`examples/BasicDemoCallback.sol`** — Minimal CC: emits `Ping`, receives `pong()` callback from RC, emits `Pong`. Paired with `BasicDemoReactive`.
+- **`examples/UniswapDemoStopOrderReactive.sol`** — Simple RC: monitors Uniswap V2 Sync events, triggers a stop-order swap when price crosses threshold.
 - **`examples/UniswapDemoStopOrderCallback.sol`** — Simple CC: executes a Uniswap token swap on Sepolia.
 - **`examples/AaveProtectionReactive.sol`** — Complex RC: cron-based periodic health check, lazy cron subscription, self-callbacks for state persistence, subscribe/unsubscribe management in `callbackOnly` functions.
 - **`examples/AaveProtectionCallback.sol`** — Complex CC: multi-config management, retry cooldown, consecutive failure tracking, auto-cancel, always emits `ProtectionCycleCompleted`.
@@ -326,9 +349,12 @@ contract MyCallback is AbstractCallback {
 
 ## 8. Implementation Workflow
 
+0. **Decide network tier** — testnet (Lasna + Sepolia/Base Sepolia) or mainnet (Reactive + Base/ETH/etc.). Never mix.
 1. **Define the event surface** — list all events the RC subscribes to (origin chain) and all lifecycle events the CC emits (feedback loop).
-2. **Write the CC first** — it's a normal Solidity contract with no RN dependencies except `AbstractCallback`. Get the logic right here.
-3. **Derive topic_0 constants** — `keccak256("EventSignature(type1,type2,...)") for each event the RC needs.
-4. **Write the RC** — constructor subscriptions, `react()` routing, self-callback helpers, `callbackOnly` persist functions, `getPausableSubscriptions()`.
+2. **Deploy CC first** — it's a normal Solidity contract with no RN dependencies except `AbstractCallback`. Pass your deployer wallet address as `_callbackSender` (that's the RVM ID). Save the CC address.
+3. **Derive topic_0 constants** — Use `cast keccak "EventSignature(type1,type2,...)"` for each event the RC needs. Never use Node.js SHA3-256 — it produces wrong hashes.
+4. **Write and deploy the RC** — constructor subscriptions, `react()` routing, self-callback helpers, `callbackOnly` persist functions, `getPausableSubscriptions()`. Deploy with `--value` to pre-fund callback delivery.
 5. **Verify the state model** — for each piece of RC state, ask: "Does `react()` need to read this?" If yes, it must be `immutable` or set in the constructor. If no, it's fine as mutable (written by `callbackOnly`).
-6. **Fund the RC** — deploy with ETH to cover callback costs. Add `withdrawAllETH()` for recovery.
+6. **Verify on Reactscan** — check RC status is `active` at `https://lasna.reactscan.net/address/<RC_ADDRESS>`.
+
+> See `references/deployment.md` for full deployment commands.

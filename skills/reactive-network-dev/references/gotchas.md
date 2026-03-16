@@ -227,6 +227,77 @@ The `vm` boolean is `false` on a live RN deployment (normal execution context) a
 
 ---
 
+## Gotcha 9: Minimum Callback Gas is 100,000
+
+**The rule:** The system enforces a minimum of 100,000 gas for any callback. Setting `CALLBACK_GAS_LIMIT` below this is silently raised to 100,000 or the callback is rejected.
+
+**Always use at least 100,000.** For complex CC logic, use 1,000,000–2,000,000.
+
+```solidity
+// BAD — will be raised to 100,000 anyway, but don't rely on silent correction
+uint64 private constant CALLBACK_GAS_LIMIT = 50_000;
+
+// GOOD
+uint64 private constant CALLBACK_GAS_LIMIT = 1_000_000;
+```
+
+---
+
+## Gotcha 10: Never Mix Mainnet and Testnet Chains
+
+**The rule:** Origin and destination chains must be from the same tier. A Lasna Testnet RC cannot deliver callbacks to Base Mainnet. A Reactive Mainnet RC cannot subscribe to Sepolia events.
+
+**What breaks:** Subscribing to Sepolia (testnet) events and pointing `DEST_CHAIN_ID` at Base Mainnet (8453). The callback is simply never delivered — no error, no revert.
+
+**Fix:** Use consistent tiers:
+- Testnet: Lasna (5318007) + Sepolia (11155111) + Base Sepolia (84532) + Unichain Sepolia (1301)
+- Mainnet: Reactive (1597) + Base (8453) + Ethereum (1) + etc.
+
+---
+
+## Gotcha 11: Faucet Limit — Max 5 ETH Per Transaction
+
+**The rule:** The lREACT faucet gives 100 lREACT per 1 ETH sent. Sending more than 5 ETH in a single transaction (= 500 lREACT) causes the **excess to be lost permanently**.
+
+**Fix:** Send in multiple transactions if you need more than 500 lREACT.
+
+```bash
+# Send 5 ETH max per transaction
+cast send $SEPOLIA_FAUCET --value 5ether --rpc-url $SEPOLIA_RPC --private-key $PRIVATE_KEY
+# Wait for confirmation, then send again if needed
+```
+
+Faucet addresses:
+- Sepolia: `0x9b9BB25f1A81078C544C829c5EB7822d747Cf434`
+- Base Sepolia: `0x2afaFD298b23b62760711756088F75B7409f5967`
+
+---
+
+## Gotcha 12: RVM ID is Your Deployer Address
+
+**The rule:** The RVM ID (passed to the CC's `AbstractCallback` constructor as `_callbackSender`) is simply the **EOA address used to deploy the RC**. It is not a separate identifier to look up.
+
+**What breaks:**
+```solidity
+// BAD — using the RC's deployed contract address
+constructor(address _callbackSender) AbstractCallback(_callbackSender) {}
+// deployed with: --constructor-args $OWNER $RC_CONTRACT_ADDRESS
+// ↑ Wrong. The CC rejects all callbacks because RVM ID ≠ RC address.
+```
+
+**Fix:**
+```bash
+# Deploy CC with the wallet address that will deploy the RC
+forge create src/MyCallback.sol:MyCallback \
+  --constructor-args $OWNER $DEPLOYER_WALLET_ADDRESS \
+  --rpc-url $SEPOLIA_RPC \
+  --private-key $SEPOLIA_PRIVATE_KEY
+```
+
+If you accidentally use a different deployer address for the RC than you passed to the CC, the CC will silently reject all callbacks from `authorizedSenderOnly`.
+
+---
+
 ## Bonus: Duplicate Event Guard
 
 When the RC subscribes to events without tight topic filters, the same event can be delivered multiple times (e.g., due to reorgs or re-deliveries). Add a deduplication check:
